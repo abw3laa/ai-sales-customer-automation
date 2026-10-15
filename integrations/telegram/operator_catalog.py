@@ -82,14 +82,14 @@ def list_review_products(*, tenant_id: str, database_url: str | None = None, lim
     with psycopg.connect(url) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """SELECT source_message_id, proposed_sku, proposed_title, warnings
+                """SELECT source_message_id, proposed_sku, proposed_title
                 FROM product_review_queue
                 WHERE tenant_id=%s::uuid AND status='needs_review'
                 ORDER BY created_at DESC LIMIT %s""",
                 (tenant_id, min(limit, 20)),
             )
             incomplete_rows = cur.fetchall()
-    for message_id, sku, title, warnings in incomplete_rows:
+    for message_id, sku, title in incomplete_rows:
         missing = []
         if not sku:
             missing.append("الكود")
