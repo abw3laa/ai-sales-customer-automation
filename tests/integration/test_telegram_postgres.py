@@ -185,3 +185,72 @@ def test_approved_product_is_audited_and_becomes_searchable(monkeypatch, tenant,
         ).fetchone()
     assert product == ("active",)
     assert audit == ("approve_product", "success")
+
+
+def test_edited_post_resolves_previous_review_and_deduplicates_media(
+    monkeypatch, tenant, postgres_schema
+):
+    monkeypatch.setenv("DATABASE_URL", postgres_schema)
+    monkeypatch.setenv("TELEGRAM_CATALOG_WEBHOOK_SECRET", "integration-secret")
+    monkeypatch.setenv("TELEGRAM_CATALOG_TENANTS", f"-100127={tenant}")
+    client = TestClient(app)
+    headers = {"X-Telegram-Bot-Api-Secret-Token": "integration-secret"}
+
+    incomplete = _telegram_update(9401, -100127, 901, "بجامة رياضية adidas\\nالسعر: 1200 TRY")
+    first = client.post("/v1/webhooks/telegram/catalog", json=incomplete, headers=headers)
+    assert first.json()["status"] == "needs_review"
+
+    edited = {
+        "update_id": 9402,
+        "edited_channel_post": {
+            "message_id": 901,
+            "chat": {"id": -100127, "type": "channel"},
+            "text": "الكود: A901\\nالاسم: بجامة رياضية adidas\\nالسعر: 1200 TRY",
+            "photo": [{"file_id": "telegram-photo-901"}],
+        },
+    }
+    second = client.post("/v1/webhooks/telegram/catalog", json=edited, headers=headers)
+    assert second.json()["status"] == "needs_review"
+
+    edited_again = {
+        "update_id": 9403,
+        "edited_channel_post": edited["edited_channel_post"],
+    }
+    third = client.post("/v1/webhooks/telegram/catalog", json=edited_again, headers=headers)
+    assert third.json()["status"] == "needs_review"
+
+    with psycopg.connect(postgres_schema) as conn:
+        queue_statuses = conn.execute(
+            """SELECT status FROM product_review_queue
+            WHERE tenant_id=%s::uuid AND source_channel_id='-100127'
+              AND source_message_id='901' ORDER BY source_update_id""",
+            (tenant,),
+        ).fetchall()
+        media_count = conn.execute(
+            """SELECT count(*) FROM product_media
+            WHERE tenant_id=%s::uuid AND telegram_file_id='telegram-photo-901'""",
+            (tenant,),
+        ).fetchone()[0]
+
+    assert queue_statuses == [("resolved",)]
+    assert media_count == 1
+
+
+def test_catalog_webhook_rejects_non_object_and_invalid_json(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CATALOG_WEBHOOK_SECRET", "integration-secret")
+    client = TestClient(app)
+    headers = {"X-Telegram-Bot-Api-Secret-Token": "integration-secret"}
+
+    invalid_json = client.post(
+        "/v1/webhooks/telegram/catalog",
+        content=b"{",
+        headers={**headers, "Content-Type": "application/json"},
+    )
+    non_object = client.post(
+        "/v1/webhooks/telegram/catalog",
+        json=["not", "an", "object"],
+        headers=headers,
+    )
+
+    assert invalid_json.status_code == 400
+    assert non_object.status_code == 400
