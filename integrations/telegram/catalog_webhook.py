@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import hmac
+import json
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
+from starlette.requests import ClientDisconnect
 
 from core.catalog.parser import parse_catalog_post
 
@@ -35,12 +37,23 @@ async def receive_catalog_post(
     ):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
-    update = await request.json()
+    try:
+        update = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, ClientDisconnect):
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+
     message = update.get("channel_post") or update.get("edited_channel_post")
     if not message:
         return {"status": "ignored", "reason": "not_channel_post"}
+    if not isinstance(message, dict):
+        raise HTTPException(status_code=400, detail="Invalid Telegram channel post")
 
-    channel_id = str((message.get("chat") or {}).get("id", ""))
+    chat = message.get("chat")
+    if not isinstance(chat, dict) or chat.get("id") is None:
+        raise HTTPException(status_code=400, detail="Missing Telegram channel ID")
+    channel_id = str(chat["id"])
     tenant_id = _channel_tenant_map().get(channel_id)
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Telegram channel is not mapped to a tenant")
@@ -61,7 +74,7 @@ async def receive_catalog_post(
         raise HTTPException(status_code=503, detail="PostgreSQL driver is not installed") from exc
 
     media = message.get("photo") or []
-    file_id = media[-1].get("file_id") if media else None
+    file_id = media[-1].get("file_id") if media and isinstance(media[-1], dict) else None
     parsed_payload = {
         "code": parsed.code,
         "title": parsed.title,
@@ -86,8 +99,17 @@ async def receive_catalog_post(
             if cur.fetchone() is None:
                 return {"status": "duplicate", "update_id": update_id}
 
+            # A Telegram edit is a new update_id for the same message. Retire the
+            # previous incomplete review item before recording the latest revision.
+            cur.execute(
+                """UPDATE product_review_queue
+                SET status='resolved', updated_at=now()
+                WHERE tenant_id=%s::uuid AND source_channel_id=%s
+                  AND source_message_id=%s AND status='needs_review'""",
+                (tenant_id, channel_id, str(message_id)),
+            )
+
             # Missing SKU/title cannot satisfy products' NOT NULL/unique contract.
-            # Preserve the original post and parsed fields in a tenant-scoped review queue.
             if not parsed.code or not parsed.title:
                 cur.execute(
                     """INSERT INTO product_review_queue
@@ -119,27 +141,24 @@ async def receive_catalog_post(
             cur.execute(
                 """INSERT INTO products
                 (tenant_id, sku, title, description, price, currency, availability, status,
-                 attributes, source_channel_id, source_message_id, last_verified_at, updated_at)
-                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), now())
+                 attributes, offer_starts_at, offer_ends_at, source_channel_id, source_message_id,
+                 last_verified_at, updated_at)
+                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s::timestamptz, %s::timestamptz, %s, %s, now(), now())
                 ON CONFLICT (tenant_id, sku) DO UPDATE SET
                  title=EXCLUDED.title, description=EXCLUDED.description, price=EXCLUDED.price,
                  currency=EXCLUDED.currency, availability=EXCLUDED.availability,
                  status=EXCLUDED.status, attributes=EXCLUDED.attributes,
+                 offer_starts_at=EXCLUDED.offer_starts_at, offer_ends_at=EXCLUDED.offer_ends_at,
                  source_channel_id=EXCLUDED.source_channel_id,
                  source_message_id=EXCLUDED.source_message_id,
                  last_verified_at=now(), updated_at=now()""",
                 (
                     tenant_id, parsed.code, parsed.title, parsed.raw_text, parsed.price,
                     parsed.currency, parsed.availability, "needs_review", Jsonb(parsed.attributes),
+                    parsed.attributes.get("offer_starts_at"), parsed.attributes.get("offer_ends_at"),
                     channel_id, str(message_id),
                 ),
-            )
-            cur.execute(
-                """UPDATE product_review_queue
-                SET status='resolved', updated_at=now()
-                WHERE tenant_id=%s::uuid AND source_channel_id=%s AND source_message_id=%s
-                  AND status='needs_review'""",
-                (tenant_id, channel_id, str(message_id)),
             )
             cur.execute(
                 """UPDATE product_ingestion_events SET status=%s, error_code=%s, processed_at=now()
@@ -152,9 +171,11 @@ async def receive_catalog_post(
             )
             if file_id:
                 cur.execute(
-                    """INSERT INTO product_media (tenant_id, product_id, telegram_file_id, media_type)
+                    """INSERT INTO product_media
+                    (tenant_id, product_id, telegram_file_id, media_type)
                     SELECT %s::uuid, id, %s, 'photo' FROM products
-                    WHERE tenant_id=%s::uuid AND sku=%s""",
+                    WHERE tenant_id=%s::uuid AND sku=%s
+                    ON CONFLICT DO NOTHING""",
                     (tenant_id, file_id, tenant_id, parsed.code),
                 )
 

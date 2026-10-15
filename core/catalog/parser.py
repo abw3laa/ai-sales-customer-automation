@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, datetime, time, timezone
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -79,6 +80,21 @@ def _list_values(value: str) -> list[str]:
     return [part.strip() for part in re.split(r"[,،;/|]+", value) if part.strip()]
 
 
+def _parse_offer_datetime(value: str) -> str | None:
+    """Parse unambiguous ISO dates/timestamps; date-only values are interpreted as UTC."""
+    candidate = value.strip()
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", candidate):
+            parsed_date = date.fromisoformat(candidate)
+            return datetime.combine(parsed_date, time.min, tzinfo=timezone.utc).isoformat()
+        parsed = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
 def parse_catalog_post(text: str, *, caption: str | None = None) -> ParsedCatalogPost:
     """Parse structured fields and common free-form Arabic/English posts.
 
@@ -135,6 +151,15 @@ def parse_catalog_post(text: str, *, caption: str | None = None) -> ParsedCatalo
         warnings.append("missing_or_ambiguous_price_currency")
     if kind == "offer" and not (fields.get("offer_starts") or fields.get("offer_ends")):
         warnings.append("offer_validity_not_specified")
+    offer_starts_at = _parse_offer_datetime(fields["offer_starts"]) if fields.get("offer_starts") else None
+    offer_ends_at = _parse_offer_datetime(fields["offer_ends"]) if fields.get("offer_ends") else None
+    if fields.get("offer_starts") and offer_starts_at is None:
+        warnings.append("invalid_offer_start_datetime_use_iso8601_with_timezone")
+    if fields.get("offer_ends") and offer_ends_at is None:
+        warnings.append("invalid_offer_end_datetime_use_iso8601_with_timezone")
+    if offer_starts_at and offer_ends_at and offer_starts_at >= offer_ends_at:
+        warnings.append("offer_start_must_precede_offer_end")
+        offer_starts_at = offer_ends_at = None
     attributes: dict[str, Any] = {"kind": kind}
     if colors:
         attributes["colors"] = list(dict.fromkeys(colors))
@@ -148,5 +173,9 @@ def parse_catalog_post(text: str, *, caption: str | None = None) -> ParsedCatalo
         attributes["offer_starts_text"] = fields["offer_starts"]
     if fields.get("offer_ends"):
         attributes["offer_ends_text"] = fields["offer_ends"]
+    if offer_starts_at:
+        attributes["offer_starts_at"] = offer_starts_at
+    if offer_ends_at:
+        attributes["offer_ends_at"] = offer_ends_at
     status = "active" if not any(w in warnings for w in ("missing_code", "missing_title", "missing_or_ambiguous_price_currency")) else "needs_review"
     return ParsedCatalogPost(code, title, price, currency, attributes, availability, status, kind, tuple(warnings), raw)

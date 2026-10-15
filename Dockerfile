@@ -8,6 +8,8 @@ COPY pyproject.toml README.md ./
 COPY apps ./apps
 COPY core ./core
 COPY integrations ./integrations
+COPY database/migrations ./database/migrations
+COPY scripts ./scripts
 RUN pip install --no-cache-dir .
 
 EXPOSE 8000
