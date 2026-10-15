@@ -243,13 +243,22 @@ def test_edited_post_resolves_previous_review_and_deduplicates_media(
               AND source_message_id='901' ORDER BY source_update_id""",
             (tenant,),
         ).fetchall()
+        product_status = conn.execute(
+            """SELECT status FROM products
+            WHERE tenant_id=%s::uuid AND sku='A901'""",
+            (tenant,),
+        ).fetchone()
         media_count = conn.execute(
             """SELECT count(*) FROM product_media
             WHERE tenant_id=%s::uuid AND telegram_file_id='telegram-photo-901'""",
             (tenant,),
         ).fetchone()[0]
 
-    assert queue_statuses == [("resolved",), ("resolved",), ("needs_review",)]
+    # Only incomplete posts belong in product_review_queue. Once edited with a
+    # SKU and title, that queue item is resolved and the product awaits approval
+    # in products.status='needs_review'.
+    assert queue_statuses == [("resolved",)]
+    assert product_status == ("needs_review",)
     assert media_count == 1
 
 
