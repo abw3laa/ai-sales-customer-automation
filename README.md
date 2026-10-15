@@ -25,7 +25,7 @@ docker compose --profile automation up --build
 
 The API will be available at `http://localhost:8000`; OpenAPI docs at `/docs`; health check at `/healthz`.
 
-On a fresh local PostgreSQL volume, Compose applies the numbered SQL files in `database/migrations/` during database initialization. This is a development bootstrap only; existing volumes do not re-run migrations. For an existing database, apply new migrations through a controlled migration step after taking a backup.
+On a fresh local PostgreSQL volume, Compose applies the numbered SQL files in `database/migrations/` during database initialization. This is a development bootstrap only; existing volumes do not re-run migrations. For an existing database, take a verified backup, then use the migration runner: `DATABASE_URL=... python scripts/migrate.py`. The runner tracks applied files in `schema_migrations` and applies each migration transactionally. Review each SQL migration before running it against a database containing business data.
 
 The optional n8n editor is bound to `127.0.0.1:5678`; complete its first-run owner setup before creating credentials. Do not expose it publicly without HTTPS, access controls, and a reviewed deployment configuration.
 

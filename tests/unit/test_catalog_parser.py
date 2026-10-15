@@ -22,3 +22,27 @@ def test_ambiguous_post_needs_review():
     assert parsed.status == "needs_review"
     assert "missing_code" in parsed.warnings
     assert "missing_or_ambiguous_price_currency" in parsed.warnings
+
+
+def test_offer_dates_are_parsed_only_when_unambiguous():
+    parsed = parse_catalog_post(
+        """Code: A202
+Name: Adidas tracksuit offer
+Price: 900 TRY
+Offer starts: 2026-10-20
+Offer ends: 2026-10-31T23:59:00+03:00"""
+    )
+    assert parsed.attributes["offer_starts_at"] == "2026-10-20T00:00:00+00:00"
+    assert parsed.attributes["offer_ends_at"] == "2026-10-31T20:59:00+00:00"
+    assert not any(warning.startswith("invalid_offer_") for warning in parsed.warnings)
+
+
+def test_ambiguous_offer_datetime_is_flagged_for_review():
+    parsed = parse_catalog_post(
+        """Code: A203
+Name: Limited offer
+Price: 900 TRY
+Offer ends: 31/10/2026"""
+    )
+    assert "invalid_offer_end_datetime_use_iso8601_with_timezone" in parsed.warnings
+    assert "offer_ends_at" not in parsed.attributes

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import hmac
+import json
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
+from starlette.requests import ClientDisconnect
 
 from core.handoff.repository import get_conversation_status, set_conversation_mode
 from integrations.telegram.operator_bot import (
@@ -51,7 +53,13 @@ async def receive_operator_update(
     ):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
-    update = await request.json()
+    try:
+        update = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, ClientDisconnect):
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+
     message = update.get("message")
     if not isinstance(message, dict) or not message.get("text"):
         return {"status": "ignored"}
