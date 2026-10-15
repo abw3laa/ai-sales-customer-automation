@@ -304,8 +304,11 @@ def test_catalog_webhook_persists_offer_validity(monkeypatch, tenant, postgres_s
             9501,
             -100128,
             951,
-            "Code: A951\\nName: Adidas tracksuit offer\\nPrice: 900 TRY\\n"
-            "Offer starts: 2026-10-20\\nOffer ends: 2026-10-31T23:59:00+03:00",
+            """Code: A951
+Name: Adidas tracksuit offer
+Price: 900 TRY
+Offer starts: 2026-10-20
+Offer ends: 2026-10-31T23:59:00+03:00""",
         ),
         headers={"X-Telegram-Bot-Api-Secret-Token": "integration-secret"},
     )
