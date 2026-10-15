@@ -141,3 +141,47 @@ def test_product_with_missing_price_cannot_be_approved(monkeypatch, tenant, post
             (tenant,),
         ).fetchone()
     assert row == ("needs_review", None, None)
+
+
+def test_approved_product_is_audited_and_becomes_searchable(monkeypatch, tenant, postgres_schema):
+    monkeypatch.setenv("DATABASE_URL", postgres_schema)
+    monkeypatch.setenv("TELEGRAM_CATALOG_WEBHOOK_SECRET", "integration-secret")
+    monkeypatch.setenv("TELEGRAM_CATALOG_TENANTS", f"-100126={tenant}")
+    monkeypatch.setenv("TELEGRAM_ALLOWED_USER_IDS", "778")
+    monkeypatch.setenv("TELEGRAM_OPERATOR_TENANTS", f"778={tenant}")
+    monkeypatch.setenv("TELEGRAM_OPERATOR_WEBHOOK_SECRET", "operator-secret")
+    client = TestClient(app)
+    headers = {"X-Telegram-Bot-Api-Secret-Token": "integration-secret"}
+
+    payload = _telegram_update(
+        9301, -100126, 801,
+        "الكود: A801\\nالاسم: بجامة رياضية adidas\\nالسعر: 1200 TRY",
+    )
+    ingested = client.post("/v1/webhooks/telegram/catalog", json=payload, headers=headers)
+    assert ingested.json()["status"] == "processed"
+
+    approved = client.post(
+        "/v1/webhooks/telegram/operator",
+        json={
+            "message": {
+                "chat": {"id": 778, "type": "private"},
+                "from": {"id": 778},
+                "text": "/approve A801",
+            }
+        },
+        headers={"X-Telegram-Bot-Api-Secret-Token": "operator-secret"},
+    )
+    assert "تم اعتماد المنتج A801" in approved.json()["text"]
+
+    with psycopg.connect(postgres_schema) as conn:
+        product = conn.execute(
+            "SELECT status FROM products WHERE tenant_id=%s::uuid AND sku='A801'",
+            (tenant,),
+        ).fetchone()
+        audit = conn.execute(
+            """SELECT action, result FROM operator_audit_log
+            WHERE tenant_id=%s::uuid AND target_id='A801' ORDER BY created_at DESC LIMIT 1""",
+            (tenant,),
+        ).fetchone()
+    assert product == ("active",)
+    assert audit == ("approve_product", "success")
