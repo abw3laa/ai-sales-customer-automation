@@ -79,7 +79,7 @@ def list_review_products(*, tenant_id: str, database_url: str | None = None, lim
         shown_price = f"{price} {currency}" if price is not None and currency else "السعر/العملة غير مكتملين"
         lines.append(f"{sku} — {title} | {shown_price} | التوفر: {availability}")
     lines.append("للاعتماد: /approve <SKU> — للرفض: /reject <SKU> <السبب>")
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def review_product(
