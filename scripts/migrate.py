@@ -30,7 +30,7 @@ def main() -> int:
         path for path in MIGRATIONS_DIR.iterdir()
         if path.is_file() and MIGRATION_NAME.fullmatch(path.name)
     )
-    with psycopg.connect(database_url) as conn:
+    with psycopg.connect(database_url, autocommit=True) as conn:
         conn.execute(
             """CREATE TABLE IF NOT EXISTS schema_migrations (
                 version TEXT PRIMARY KEY,
