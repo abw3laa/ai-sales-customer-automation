@@ -5,7 +5,12 @@ import os
 from fastapi import APIRouter, Header, HTTPException, Request
 from core.handoff.repository import get_conversation_status, set_conversation_mode
 from integrations.telegram.operator_bot import HELP, authorized_operator, parse_operator_text
-from integrations.telegram.operator_catalog import (\n    list_review_products,\n    lookup_product,\n    review_product,\n    search_products,\n)
+from integrations.telegram.operator_catalog import (
+    list_review_products,
+    lookup_product,
+    review_product,
+    search_products,
+)
 
 router = APIRouter(prefix="/v1/webhooks/telegram", tags=["telegram-operator"])
 
