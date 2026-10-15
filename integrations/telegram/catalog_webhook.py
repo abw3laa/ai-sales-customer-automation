@@ -130,7 +130,7 @@ async def receive_catalog_post(
                  last_verified_at=now(), updated_at=now()""",
                 (
                     tenant_id, parsed.code, parsed.title, parsed.raw_text, parsed.price,
-                    parsed.currency, parsed.availability, parsed.status, Jsonb(parsed.attributes),
+                    parsed.currency, parsed.availability, "needs_review", Jsonb(parsed.attributes),
                     channel_id, str(message_id),
                 ),
             )
@@ -145,7 +145,7 @@ async def receive_catalog_post(
                 """UPDATE product_ingestion_events SET status=%s, error_code=%s, processed_at=now()
                 WHERE tenant_id=%s::uuid AND source_channel_id=%s AND source_update_id=%s""",
                 (
-                    "needs_review" if parsed.status != "active" else "processed",
+                    "needs_review",
                     ",".join(parsed.warnings) or None,
                     tenant_id, channel_id, str(update_id),
                 ),
@@ -159,7 +159,7 @@ async def receive_catalog_post(
                 )
 
     return {
-        "status": "processed" if parsed.status == "active" else "needs_review",
+        "status": "needs_review",
         "code": parsed.code,
         "kind": parsed.kind,
         "warnings": list(parsed.warnings),
