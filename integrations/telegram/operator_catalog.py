@@ -53,3 +53,72 @@ def search_products(query: str, *, tenant_id: str, database_url: str | None = No
     if not rows:
         return "لا توجد نتائج مؤكدة؛ لا تخمّن السعر أو التوفر."
     return "\n\n".join(_format_product(dict(zip(keys, row, strict=True))) for row in rows)
+
+
+def list_review_products(*, tenant_id: str, database_url: str | None = None, limit: int = 10) -> str:
+    """List products awaiting a human decision, scoped to one tenant."""
+    url = database_url or os.getenv("DATABASE_URL", "")
+    if not url:
+        return "قاعدة البيانات غير مهيأة."
+    import psycopg
+
+    limit = max(1, min(int(limit), 20))
+    with psycopg.connect(url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT sku, title, price::text, currency, availability
+                FROM products WHERE tenant_id=%s::uuid AND status='needs_review'
+                ORDER BY updated_at DESC LIMIT %s""",
+                (tenant_id, limit),
+            )
+            rows = cur.fetchall()
+    if not rows:
+        return "لا توجد منتجات بانتظار المراجعة."
+    lines = ["المنتجات التي تحتاج إلى مراجعة:"]
+    for sku, title, price, currency, availability in rows:
+        shown_price = f"{price} {currency}" if price is not None and currency else "السعر/العملة غير مكتملين"
+        lines.append(f"{sku} — {title} | {shown_price} | التوفر: {availability}")
+    lines.append("للاعتماد: /approve <SKU> — للرفض: /reject <SKU> <السبب>")
+    return "\\n".join(lines)
+
+
+def review_product(
+    sku: str, *, tenant_id: str, telegram_user_id: int, approve: bool,
+    reason: str = "", database_url: str | None = None,
+) -> str:
+    """Approve or archive a reviewed product and write an audit record atomically."""
+    url = database_url or os.getenv("DATABASE_URL", "")
+    if not url:
+        return "قاعدة البيانات غير مهيأة."
+    if not sku.strip():
+        return "استخدم /approve <SKU> أو /reject <SKU> <السبب>."
+    import psycopg
+
+    with psycopg.connect(url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT title, price, currency, status FROM products
+                WHERE tenant_id=%s::uuid AND sku=%s FOR UPDATE""",
+                (tenant_id, sku.strip()),
+            )
+            row = cur.fetchone()
+            if not row or row[3] != "needs_review":
+                return "لم يُعثر على منتج بهذا الكود يحتاج إلى مراجعة."
+            title, price, currency, _status = row
+            if approve and (price is None or not currency):
+                return "لا يمكن اعتماد المنتج قبل تسجيل السعر والعملة الصحيحين."
+            new_status = "active" if approve else "archived"
+            cur.execute(
+                """UPDATE products SET status=%s, updated_at=now(), last_verified_at=now()
+                WHERE tenant_id=%s::uuid AND sku=%s""",
+                (new_status, tenant_id, sku.strip()),
+            )
+            cur.execute(
+                """INSERT INTO operator_audit_log
+                (tenant_id, telegram_user_id, action, target_type, target_id, result, metadata)
+                VALUES (%s::uuid, %s, %s, 'product', %s, 'success', %s::jsonb)""",
+                (tenant_id, str(telegram_user_id), "approve_product" if approve else "reject_product",
+                 sku.strip(), __import__("json").dumps({"reason": reason[:500], "title": title}, ensure_ascii=False)),
+            )
+    return (f"تم اعتماد المنتج {sku.strip()} ونشره في نتائج البحث." if approve
+            else f"تم أرشفة المنتج {sku.strip()} بعد المراجعة.")
