@@ -249,7 +249,7 @@ def test_edited_post_resolves_previous_review_and_deduplicates_media(
             (tenant,),
         ).fetchone()[0]
 
-    assert queue_statuses == [("resolved",)]
+    assert queue_statuses == [("resolved",), ("resolved",), ("needs_review",)]
     assert media_count == 1
 
 
