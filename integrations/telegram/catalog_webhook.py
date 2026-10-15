@@ -21,7 +21,7 @@ async def receive_catalog_post(
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ) -> dict:
-    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+    expected = os.getenv("TELEGRAM_CATALOG_WEBHOOK_SECRET") or os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
     if not expected or not x_telegram_bot_api_secret_token or not hmac.compare_digest(expected, x_telegram_bot_api_secret_token):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
     update = await request.json()
