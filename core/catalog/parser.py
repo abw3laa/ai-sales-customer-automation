@@ -84,7 +84,7 @@ def _parse_offer_datetime(value: str) -> str | None:
     """Parse unambiguous ISO dates/timestamps; date-only values are interpreted as UTC."""
     candidate = value.strip()
     try:
-        if re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", candidate):
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", candidate):
             parsed_date = date.fromisoformat(candidate)
             return datetime.combine(parsed_date, time.min, tzinfo=timezone.utc).isoformat()
         parsed = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
