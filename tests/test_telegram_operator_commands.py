@@ -1,5 +1,3 @@
-import os
-
 from integrations.telegram.operator_bot import authorized_operator, parse_operator_text
 from integrations.telegram.operator_webhook import _tenant_for_operator, _telegram_reply
 
@@ -31,7 +29,10 @@ def test_parse_operator_text_rejects_empty_or_unrecognized_text():
 
 
 def test_tenant_mapping_is_scoped_to_operator_id(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_OPERATOR_TENANTS", "123=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa,456=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    monkeypatch.setenv(
+        "TELEGRAM_OPERATOR_TENANTS",
+        "123=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa,456=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    )
     assert _tenant_for_operator(123) == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     assert _tenant_for_operator(456) == "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     assert _tenant_for_operator(789) == ""
