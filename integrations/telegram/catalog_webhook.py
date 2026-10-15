@@ -141,18 +141,22 @@ async def receive_catalog_post(
             cur.execute(
                 """INSERT INTO products
                 (tenant_id, sku, title, description, price, currency, availability, status,
-                 attributes, source_channel_id, source_message_id, last_verified_at, updated_at)
-                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), now())
+                 attributes, offer_starts_at, offer_ends_at, source_channel_id, source_message_id,
+                 last_verified_at, updated_at)
+                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s::timestamptz, %s::timestamptz, %s, %s, now(), now())
                 ON CONFLICT (tenant_id, sku) DO UPDATE SET
                  title=EXCLUDED.title, description=EXCLUDED.description, price=EXCLUDED.price,
                  currency=EXCLUDED.currency, availability=EXCLUDED.availability,
                  status=EXCLUDED.status, attributes=EXCLUDED.attributes,
+                 offer_starts_at=EXCLUDED.offer_starts_at, offer_ends_at=EXCLUDED.offer_ends_at,
                  source_channel_id=EXCLUDED.source_channel_id,
                  source_message_id=EXCLUDED.source_message_id,
                  last_verified_at=now(), updated_at=now()""",
                 (
                     tenant_id, parsed.code, parsed.title, parsed.raw_text, parsed.price,
                     parsed.currency, parsed.availability, "needs_review", Jsonb(parsed.attributes),
+                    parsed.attributes.get("offer_starts_at"), parsed.attributes.get("offer_ends_at"),
                     channel_id, str(message_id),
                 ),
             )
