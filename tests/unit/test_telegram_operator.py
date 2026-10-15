@@ -6,7 +6,10 @@ def test_operator_allowlist():
 
 def test_slash_command_parsing():
     assert parse_operator_text("/product A100") == ("/product", "A100")
-    assert parse_operator_text("/search adidas") == ("/search", "adidas")\n    assert parse_operator_text("/review") == ("/review", "")\n    assert parse_operator_text("/approve A100") == ("/approve", "A100")\n    assert parse_operator_text("/reject A100 price unclear") == ("/reject", "A100 price unclear")
+    assert parse_operator_text("/search adidas") == ("/search", "adidas")
+    assert parse_operator_text("/review") == ("/review", "")
+    assert parse_operator_text("/approve A100") == ("/approve", "A100")
+    assert parse_operator_text("/reject A100 price unclear") == ("/reject", "A100 price unclear")
     assert parse_operator_text("/status abc-123") == ("/status", "abc-123")
 
 def test_legacy_control_commands():
