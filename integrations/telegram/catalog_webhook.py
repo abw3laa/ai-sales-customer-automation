@@ -135,6 +135,13 @@ async def receive_catalog_post(
                 ),
             )
             cur.execute(
+                """UPDATE product_review_queue
+                SET status='resolved', updated_at=now()
+                WHERE tenant_id=%s::uuid AND source_channel_id=%s AND source_message_id=%s
+                  AND status='needs_review'""",
+                (tenant_id, channel_id, str(message_id)),
+            )
+            cur.execute(
                 """UPDATE product_ingestion_events SET status=%s, error_code=%s, processed_at=now()
                 WHERE tenant_id=%s::uuid AND source_channel_id=%s AND source_update_id=%s""",
                 (
