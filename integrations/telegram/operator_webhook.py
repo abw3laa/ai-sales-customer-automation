@@ -17,6 +17,10 @@ def _tenant_for_operator(user_id: int) -> str:
                 return value.strip()
     return ""
 
+def _telegram_reply(chat_id: int, text: str) -> dict:
+    # Telegram supports Bot API methods in the webhook response body.
+    return {"method": "sendMessage", "chat_id": chat_id, "text": text[:3900]}
+
 @router.post("/operator", status_code=200)
 async def receive_operator_update(
     request: Request,
@@ -32,13 +36,14 @@ async def receive_operator_update(
     chat = message.get("chat") or {}
     sender = message.get("from") or {}
     user_id = sender.get("id")
-    if chat.get("type") != "private" or not isinstance(user_id, int):
+    chat_id = chat.get("id")
+    if chat.get("type") != "private" or not isinstance(user_id, int) or not isinstance(chat_id, int):
         return {"status": "ignored"}
     if not authorized_operator(user_id):
-        return {"status": "denied", "reply": "غير مصرح لك باستخدام بوت الإدارة."}
+        return _telegram_reply(chat_id, "غير مصرح لك باستخدام بوت الإدارة.")
     parsed = parse_operator_text(message["text"])
     if not parsed:
-        return {"status": "help", "reply": HELP}
+        return _telegram_reply(chat_id, HELP)
     command, argument = parsed
     tenant_id = _tenant_for_operator(user_id)
     if command in ("/help", "/start"):
@@ -59,4 +64,4 @@ async def receive_operator_update(
         reply = "قائمة مراجعة المنتجات لم تُنفذ بعد."
     else:
         reply = HELP
-    return {"status": "processed", "command": command, "chat_id": chat.get("id"), "reply": reply}
+    return _telegram_reply(chat_id, reply)
