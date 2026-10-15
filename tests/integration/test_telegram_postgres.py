@@ -271,3 +271,14 @@ def test_catalog_webhook_rejects_non_object_and_invalid_json(monkeypatch):
 
     assert invalid_json.status_code == 400
     assert non_object.status_code == 400
+
+
+def test_schema_accepts_telegram_as_a_conversation_channel(tenant, postgres_schema):
+    with psycopg.connect(postgres_schema) as conn:
+        row = conn.execute(
+            """INSERT INTO channels (tenant_id, provider, external_account_id, display_name)
+            VALUES (%s::uuid, 'telegram', '-100987', 'Integration Telegram')
+            RETURNING provider, external_account_id""",
+            (tenant,),
+        ).fetchone()
+    assert row == ("telegram", "-100987")
