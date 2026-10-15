@@ -155,7 +155,7 @@ def test_approved_product_is_audited_and_becomes_searchable(monkeypatch, tenant,
 
     payload = _telegram_update(
         9301, -100126, 801,
-        "الكود: A801\\nالاسم: بجامة رياضية adidas\\nالسعر: 1200 TRY",
+        "الكود: A801\nالاسم: بجامة رياضية adidas\nالسعر: 1200 TRY",
     )
     ingested = client.post("/v1/webhooks/telegram/catalog", json=payload, headers=headers)
     assert ingested.json()["status"] == "processed"
