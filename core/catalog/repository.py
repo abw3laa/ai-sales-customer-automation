@@ -1,7 +1,6 @@
 """PostgreSQL persistence and tenant-scoped retrieval for the product catalog."""
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from core.catalog.models import ProductRecord
