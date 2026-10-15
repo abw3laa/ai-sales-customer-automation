@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 from core.config import get_settings
 from integrations.telegram.catalog_webhook import router as telegram_catalog_router
+from integrations.telegram.operator_webhook import router as telegram_operator_router
 
 settings = get_settings()
 app = FastAPI(
@@ -10,6 +11,8 @@ app = FastAPI(
     version="0.1.0",
     description="API foundation for the AI Sales & Customer Automation System",
 )
+app.include_router(telegram_catalog_router)
+app.include_router(telegram_operator_router)
 
 
 class WebhookEnvelope(BaseModel):
