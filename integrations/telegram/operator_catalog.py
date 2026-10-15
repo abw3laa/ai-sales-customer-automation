@@ -72,14 +72,37 @@ def list_review_products(*, tenant_id: str, database_url: str | None = None, lim
                 (tenant_id, limit),
             )
             rows = cur.fetchall()
-    if not rows:
-        return "لا توجد منتجات بانتظار المراجعة."
     lines = ["المنتجات التي تحتاج إلى مراجعة:"]
     for sku, title, price, currency, availability in rows:
         shown_price = f"{price} {currency}" if price is not None and currency else "السعر/العملة غير مكتملين"
         lines.append(f"{sku} — {title} | {shown_price} | التوفر: {availability}")
+
+    # Posts missing a SKU/title are held separately because they cannot satisfy
+    # products.sku/title constraints. Operators can edit the original channel post.
+    with psycopg.connect(url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT source_message_id, proposed_sku, proposed_title
+                FROM product_review_queue
+                WHERE tenant_id=%s::uuid AND status='needs_review'
+                ORDER BY created_at DESC LIMIT %s""",
+                (tenant_id, min(limit, 20)),
+            )
+            incomplete_rows = cur.fetchall()
+    for message_id, sku, title in incomplete_rows:
+        missing = []
+        if not sku:
+            missing.append("الكود")
+        if not title:
+            missing.append("اسم المنتج")
+        lines.append(
+            f"منشور Telegram #{message_id} — بيانات ناقصة: {', '.join(missing) or 'تحقق يدوي'}"
+        )
+    if len(lines) == 1:
+        return "لا توجد منتجات أو منشورات بانتظار المراجعة."
     lines.append("للاعتماد: /approve <SKU> — للرفض: /reject <SKU> <السبب>")
-    return "\\n".join(lines)
+    lines.append("المنشورات ذات الكود/الاسم الناقص: عدّل المنشور الأصلي ثم أعد إرساله؛ لا تُنشر تلقائيًا.")
+    return "\n".join(lines)
 
 
 def review_product(

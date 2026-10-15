@@ -18,9 +18,18 @@ Requirements: Python 3.11+ and Docker Compose.
 ```bash
 cp .env.example .env
 docker compose up --build
+
+# Optional local n8n workflow editor (binds to localhost only)
+docker compose --profile automation up --build
 ```
 
 The API will be available at `http://localhost:8000`; OpenAPI docs at `/docs`; health check at `/healthz`.
+
+On a fresh local PostgreSQL volume, Compose applies the numbered SQL files in `database/migrations/` during database initialization. This is a development bootstrap only; existing volumes do not re-run migrations. For an existing database, apply new migrations through a controlled migration step after taking a backup.
+
+The optional n8n editor is bound to `127.0.0.1:5678`; complete its first-run owner setup before creating credentials. Do not expose it publicly without HTTPS, access controls, and a reviewed deployment configuration.
+
+Telegram catalog posts with a missing SKU or title are stored in `product_review_queue` and shown by `/review`. Edit the original Telegram channel post to supply the missing data and let Telegram send the edited-post update. Products missing price or currency remain `needs_review` and cannot be approved with `/approve` until the source post is corrected.
 
 For local Python development, create and activate a virtual environment, then run:
 
