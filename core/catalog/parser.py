@@ -94,7 +94,12 @@ def parse_catalog_post(text: str, *, caption: str | None = None) -> ParsedCatalo
         if m:
             code = m.group(1).upper()
         else:
-            m = re.search(r"\b([A-Z]{1,5}[-_]?[A-Z0-9]{2,20})\b", raw)
+            # A bare all-letter brand such as ADIDAS is not a product SKU.
+            # Infer an unlabeled code only when it contains at least one digit.
+            m = re.search(
+                r"\b(?=[A-Z0-9_-]*[0-9])[A-Z]{1,5}[-_]?[A-Z0-9]{2,20}\b",
+                raw,
+            )
             if m:
                 code = m.group(1).upper()
     if not title:
