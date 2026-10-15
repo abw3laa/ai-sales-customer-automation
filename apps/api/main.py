@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
+from integrations.telegram.catalog_webhook import router as telegram_catalog_router
 
 settings = get_settings()
 app = FastAPI(
