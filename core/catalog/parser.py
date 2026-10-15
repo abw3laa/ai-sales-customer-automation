@@ -101,7 +101,7 @@ def parse_catalog_post(text: str, *, caption: str | None = None) -> ParsedCatalo
                 raw,
             )
             if m:
-                code = m.group(1).upper()
+                code = m.group(0).upper()
     if not title:
         for line in raw.splitlines():
             candidate = line.strip().lstrip("-•* ").strip()
