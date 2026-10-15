@@ -291,3 +291,56 @@ def test_schema_accepts_telegram_as_a_conversation_channel(tenant, postgres_sche
             (tenant,),
         ).fetchone()
     assert row == ("telegram", "-100987")
+
+
+def test_catalog_webhook_persists_offer_validity(monkeypatch, tenant, postgres_schema):
+    monkeypatch.setenv("DATABASE_URL", postgres_schema)
+    monkeypatch.setenv("TELEGRAM_CATALOG_WEBHOOK_SECRET", "integration-secret")
+    monkeypatch.setenv("TELEGRAM_CATALOG_TENANTS", f"-100128={tenant}")
+    client = TestClient(app)
+    response = client.post(
+        "/v1/webhooks/telegram/catalog",
+        json=_telegram_update(
+            9501,
+            -100128,
+            951,
+            "Code: A951\\nName: Adidas tracksuit offer\\nPrice: 900 TRY\\n"
+            "Offer starts: 2026-10-20\\nOffer ends: 2026-10-31T23:59:00+03:00",
+        ),
+        headers={"X-Telegram-Bot-Api-Secret-Token": "integration-secret"},
+    )
+    assert response.status_code == 202
+    with psycopg.connect(postgres_schema) as conn:
+        row = conn.execute(
+            """SELECT offer_starts_at, offer_ends_at FROM products
+            WHERE tenant_id=%s::uuid AND sku='A951'""",
+            (tenant,),
+        ).fetchone()
+    assert row is not None
+    assert row[0].isoformat() == "2026-10-20T00:00:00+00:00"
+    assert row[1].isoformat() == "2026-10-31T20:59:00+00:00"
+
+
+def test_product_lookup_is_isolated_by_tenant(postgres_schema):
+    from integrations.telegram.operator_catalog import lookup_product
+
+    tenant_a, tenant_b = str(uuid4()), str(uuid4())
+    with psycopg.connect(postgres_schema) as conn:
+        conn.execute(
+            "INSERT INTO tenants (id, name, slug) VALUES (%s::uuid, %s, %s), (%s::uuid, %s, %s)",
+            (tenant_a, "Tenant A", f"test-{tenant_a}", tenant_b, "Tenant B", f"test-{tenant_b}"),
+        )
+        conn.execute(
+            """INSERT INTO products (tenant_id, sku, title, price, currency, status)
+            VALUES (%s::uuid, 'SHARED-SKU', 'Tenant A Product', 10, 'TRY', 'active'),
+                   (%s::uuid, 'SHARED-SKU', 'Tenant B Product', 20, 'TRY', 'active')""",
+            (tenant_a, tenant_b),
+        )
+    try:
+        result_a = lookup_product("SHARED-SKU", tenant_id=tenant_a, database_url=postgres_schema)
+        result_b = lookup_product("SHARED-SKU", tenant_id=tenant_b, database_url=postgres_schema)
+        assert "Tenant A Product" in result_a and "Tenant B Product" not in result_a
+        assert "Tenant B Product" in result_b and "Tenant A Product" not in result_b
+    finally:
+        with psycopg.connect(postgres_schema) as conn:
+            conn.execute("DELETE FROM tenants WHERE id IN (%s::uuid, %s::uuid)", (tenant_a, tenant_b))
