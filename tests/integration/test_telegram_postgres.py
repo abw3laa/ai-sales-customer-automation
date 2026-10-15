@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from apps.api.main import app
 
-MIGRATIONS = sorted((Path(__file__).parents[1] / "database" / "migrations").glob("*.sql"))
+MIGRATIONS = sorted((Path(__file__).parents[2] / "database" / "migrations").glob("*.sql"))
 DATABASE_URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
 
 
