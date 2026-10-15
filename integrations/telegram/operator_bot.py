@@ -8,6 +8,8 @@ HELP = """أوامر الأدمن:
 /product A100
 /search adidas
 /review
+/approve <SKU>
+/reject <SKU> <reason>
 /human <conversation_id>
 /ai <conversation_id>
 /status <conversation_id>
