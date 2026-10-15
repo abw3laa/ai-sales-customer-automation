@@ -70,7 +70,7 @@ def test_catalog_webhook_auth_and_tenant_mapping(monkeypatch, tenant, postgres_s
     monkeypatch.setenv("TELEGRAM_CATALOG_WEBHOOK_SECRET", "integration-secret")
     monkeypatch.setenv("TELEGRAM_CATALOG_TENANTS", f"-100123={tenant}")
     client = TestClient(app)
-    payload = _telegram_update(9001, -100123, 501, "الكود: A501\nالاسم: بجامة رياضية adidas\nالسعر: 1200 TRY")
+    payload = _telegram_update(9001, -100123, 501, "الكود: A501\nاسم المنتج: بجامة رياضية adidas\nالسعر: 1200 TRY")
 
     assert client.post("/v1/webhooks/telegram/catalog", json=payload).status_code == 401
     forbidden = client.post(
@@ -131,7 +131,7 @@ def test_product_with_missing_price_cannot_be_approved(monkeypatch, tenant, post
     monkeypatch.setenv("TELEGRAM_OPERATOR_WEBHOOK_SECRET", "operator-secret")
     client = TestClient(app)
 
-    payload = _telegram_update(9201, -100125, 701, "الكود: A701\nالاسم: بجامة رياضية adidas")
+    payload = _telegram_update(9201, -100125, 701, "الكود: A701\nاسم المنتج: بجامة رياضية adidas")
     catalog_response = client.post(
         "/v1/webhooks/telegram/catalog",
         json=payload,
@@ -172,7 +172,7 @@ def test_approved_product_is_audited_and_becomes_searchable(monkeypatch, tenant,
 
     payload = _telegram_update(
         9301, -100126, 801,
-        "الكود: A801\nالاسم: بجامة رياضية adidas\nالسعر: 1200 TRY",
+        "الكود: A801\nاسم المنتج: بجامة رياضية adidas\nالسعر: 1200 TRY",
     )
     ingested = client.post("/v1/webhooks/telegram/catalog", json=payload, headers=headers)
     assert ingested.json()["status"] == "needs_review"
@@ -222,7 +222,7 @@ def test_edited_post_resolves_previous_review_and_deduplicates_media(
         "edited_channel_post": {
             "message_id": 901,
             "chat": {"id": -100127, "type": "channel"},
-            "text": "الكود: A901\\nالاسم: بجامة رياضية adidas\\nالسعر: 1200 TRY",
+            "text": "الكود: A901\\nاسم المنتج: بجامة رياضية adidas\\nالسعر: 1200 TRY",
             "photo": [{"file_id": "telegram-photo-901"}],
         },
     }
