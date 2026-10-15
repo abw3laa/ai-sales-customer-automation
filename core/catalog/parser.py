@@ -55,7 +55,7 @@ def _field_lines(text: str) -> dict[str, str]:
 
 def _price(text: str) -> tuple[Decimal | None, str | None]:
     # Accept examples such as "1200 ₺", "1,200 TRY", "1200.50 TL".
-    match = re.search(r"(?<!\w)(\d[\d.,]*)(?:\s*)(₺|TL|TRY|USD|\$|EUR|€)\b?", text, re.IGNORECASE)
+    match = re.search(r"(?<!\\w)(\\d[\\d.,]*)\\s*(₺|TL|TRY|USD|\\$|EUR|€)(?!\\w)", text, re.IGNORECASE)
     if not match:
         # Unicode currency symbols may not have a word boundary after them.
         match = re.search(r"(\d[\d.,]*)\s*(₺|TL|TRY|USD|\$|EUR|€)", text, re.IGNORECASE)
