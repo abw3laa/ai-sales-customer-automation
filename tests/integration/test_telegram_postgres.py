@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,9 +20,24 @@ DATABASE_URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
 def postgres_schema():
     if not DATABASE_URL:
         pytest.skip("Set TEST_DATABASE_URL to run PostgreSQL integration tests")
-    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        for migration in MIGRATIONS:
-            conn.execute(migration.read_text(encoding="utf-8"), prepare=False)
+    migration_env = os.environ.copy()
+    migration_env["DATABASE_URL"] = DATABASE_URL
+    subprocess.run(
+        [sys.executable, "scripts/migrate.py"],
+        check=True,
+        env=migration_env,
+        capture_output=True,
+        text=True,
+    )
+    # A second pass verifies that the migration ledger skips already-applied files.
+    second_pass = subprocess.run(
+        [sys.executable, "scripts/migrate.py"],
+        check=True,
+        env=migration_env,
+        capture_output=True,
+        text=True,
+    )
+    assert "SKIP 0004_product_media_deduplication.sql" in second_pass.stdout
     return DATABASE_URL
 
 
