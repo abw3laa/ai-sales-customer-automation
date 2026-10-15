@@ -1,4 +1,4 @@
-"Secure Telegram channel-post ingestion endpoint."""
+"""Secure Telegram channel-post ingestion endpoint."""
 from __future__ import annotations
 
 import hmac
