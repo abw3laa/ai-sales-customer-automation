@@ -62,7 +62,7 @@ def test_catalog_webhook_auth_and_tenant_mapping(monkeypatch, tenant, postgres_s
         headers={"X-Telegram-Bot-Api-Secret-Token": "integration-secret"},
     )
     assert forbidden.status_code == 202
-    assert forbidden.json()["status"] == "processed"
+    assert forbidden.json()["status"] == "needs_review"
 
     unmapped = client.post(
         "/v1/webhooks/telegram/catalog",
@@ -158,7 +158,7 @@ def test_approved_product_is_audited_and_becomes_searchable(monkeypatch, tenant,
         "الكود: A801\nالاسم: بجامة رياضية adidas\nالسعر: 1200 TRY",
     )
     ingested = client.post("/v1/webhooks/telegram/catalog", json=payload, headers=headers)
-    assert ingested.json()["status"] == "processed"
+    assert ingested.json()["status"] == "needs_review"
 
     approved = client.post(
         "/v1/webhooks/telegram/operator",
