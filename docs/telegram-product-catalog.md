@@ -73,3 +73,28 @@ Existing `sender-id/Human` and `sender-id/AI` syntax can be retained as an alias
 5. Implement operator bot commands, access control, notifications, and audit log.
 6. Add image/media support and human review for uncertain extraction.
 7. Test with a private staging channel and test bot before production.
+
+
+## Implemented catalog ingestion endpoint
+
+The FastAPI application mounts `POST /v1/webhooks/telegram/catalog`. It expects Telegram's `X-Telegram-Bot-Api-Secret-Token` header, reads `channel_post` and `edited_channel_post`, validates a configured channel-to-tenant mapping, and writes the product and ingestion event to PostgreSQL. Duplicate update IDs are ignored. Product photos are referenced by Telegram file ID; durable media download/object storage is not implemented yet.
+
+Required environment variables:
+
+- `DATABASE_URL`: PostgreSQL connection URL accepted by psycopg (for example `postgresql://...`).
+- `TELEGRAM_WEBHOOK_SECRET`: a long random secret passed to Telegram when configuring the webhook.
+- `TELEGRAM_CATALOG_TENANTS`: comma-separated `<telegram-channel-id>=<tenant-uuid>` mappings.
+
+Example publishing format (both Arabic and English labels are supported):
+
+```text
+اسم المنتج: بجامة رياضية adidas
+الكود: A100
+السعر: 1200 ₺
+الألوان: الأصفر، الأبيض، الأخضر، الأحمر، الأسود، البيج، الذهبي
+المقاسات: S، M، L، XL، XXL
+```
+
+You may also publish a free-form post. If the parser cannot confidently identify a product code, title, price, or currency, the record is marked for review or the post is returned as `needs_review`. Product code is the stable key, so use a unique code for each independently priced product/offer. Offer posts should include an end date; automated date parsing and expiration scheduling remain follow-up work.
+
+This is an initial implementation, not production-ready. Before launch, run migrations 0001 and 0002, configure Telegram's webhook with the secret token, configure the channel-to-tenant mapping, and test using a private staging channel. Edited posts currently update the matching product by SKU when Telegram emits the edit update; Telegram post deletion handling and complete media lifecycle are not yet implemented.
