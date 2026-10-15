@@ -1,7 +1,5 @@
 """Small, deterministic lead-scoring policy; business-specific rules can override it."""
 from dataclasses import dataclass
-from typing import Iterable
-
 
 @dataclass(frozen=True)
 class LeadSignals:
