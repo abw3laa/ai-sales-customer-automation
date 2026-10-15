@@ -26,5 +26,5 @@ build/
 Thumbs.db
 
 # Local data
- data/
+data/
 *.log
