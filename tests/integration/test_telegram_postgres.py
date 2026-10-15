@@ -213,7 +213,7 @@ def test_edited_post_resolves_previous_review_and_deduplicates_media(
     client = TestClient(app)
     headers = {"X-Telegram-Bot-Api-Secret-Token": "integration-secret"}
 
-    incomplete = _telegram_update(9401, -100127, 901, "بجامة رياضية adidas\\nالسعر: 1200 TRY")
+    incomplete = _telegram_update(9401, -100127, 901, "بجامة رياضية adidas\nالسعر: 1200 TRY")
     first = client.post("/v1/webhooks/telegram/catalog", json=incomplete, headers=headers)
     assert first.json()["status"] == "needs_review"
 
@@ -222,7 +222,7 @@ def test_edited_post_resolves_previous_review_and_deduplicates_media(
         "edited_channel_post": {
             "message_id": 901,
             "chat": {"id": -100127, "type": "channel"},
-            "text": "الكود: A901\\nاسم المنتج: بجامة رياضية adidas\\nالسعر: 1200 TRY",
+            "text": "الكود: A901\nاسم المنتج: بجامة رياضية adidas\nالسعر: 1200 TRY",
             "photo": [{"file_id": "telegram-photo-901"}],
         },
     }
