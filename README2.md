@@ -132,14 +132,14 @@ pytest
 ## 7. نتائج CI التي تم التحقق منها
 
 آخر تشغيل تم التحقق منه في 15 أكتوبر 2026:
-- سير العمل: `CI`، رقم التشغيل `91`.
+- سير العمل: `CI`، رقم التشغيل `38791491479`.
 - النتيجة: `success`.
-- Commit المختبر: `de6436218a0df51d9b7c56a9f7c1f78063a9c83d` على فرع `hardening/production-readiness`.
-- الخطوات: تثبيت الاعتماديات، وRuff lint، واختبارات pytest مع خدمة PostgreSQL؛ جميعها نجحت.
+- Commit المختبر: `65657d5138e5c61719db9c43baeca38c6a9e1736` على فرع `hardening/production-readiness`.
+- الخطوات: تهيئة خدمة PostgreSQL، وتثبيت الاعتماديات، وRuff lint، واختبارات pytest؛ جميعها نجحت.
 
 هذه النتيجة تخص الـ commit أعلاه فقط. أي تعديل لاحق يحتاج إلى فحص CI الخاص به قبل اعتباره متحققًا. نجاح CI لا يثبت وحده جاهزية الإنتاج أو أن الخدمات نُشرت على خادم.
 
-رابط التشغيل: https://github.com/abw3laa/ai-sales-customer-automation/actions/runs/38788090738
+رابط التشغيل: https://github.com/abw3laa/ai-sales-customer-automation/actions/runs/38791491479
 
 ## 8. النواقص والمخاطر قبل الإنتاج
 
