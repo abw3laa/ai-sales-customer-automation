@@ -99,6 +99,8 @@ ALTER TABLE leads
     REFERENCES conversations (tenant_id, id) ON DELETE SET NULL (conversation_id);
 
 ALTER TABLE product_media
+    DROP CONSTRAINT IF EXISTS product_media_product_id_fkey;
+ALTER TABLE product_media
     ADD CONSTRAINT product_media_tenant_product_fkey
     FOREIGN KEY (tenant_id, product_id)
     REFERENCES products (tenant_id, id) ON DELETE CASCADE;
