@@ -37,6 +37,32 @@ def main() -> int:
                 applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )"""
         )
+        applied_count = conn.execute(
+            "SELECT count(*) FROM schema_migrations"
+        ).fetchone()[0]
+        if applied_count == 0:
+            existing_schema = conn.execute(
+                """SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_class AS c
+                    JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+                    WHERE n.nspname = 'public'
+                      AND c.relkind IN ('r', 'p')
+                      AND c.relname = ANY (%s)
+                )""",
+                ([
+                    'tenants', 'channels', 'contacts', 'conversations',
+                    'messages', 'leads', 'products', 'product_media',
+                    'product_variants', 'product_review_queue',
+                ],),
+            ).fetchone()[0]
+            if existing_schema:
+                raise RuntimeError(
+                    "Existing application tables were found but schema_migrations is empty. "
+                    "Refusing to apply all migrations blindly. Back up the database, verify "
+                    "its schema against the migration history, then perform an explicit "
+                    "baseline procedure documented in docs/DATABASE_MIGRATIONS.md."
+                )
         for migration in files:
             with conn.transaction():
                 applied = conn.execute(

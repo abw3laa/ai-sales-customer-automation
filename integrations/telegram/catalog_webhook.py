@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import hmac
-import json
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
-from starlette.requests import ClientDisconnect
 
 from core.catalog.parser import parse_catalog_post
+from integrations.telegram.webhook_utils import read_telegram_update
 
 router = APIRouter(prefix="/v1/webhooks/telegram", tags=["telegram-catalog"])
 
@@ -37,12 +36,7 @@ async def receive_catalog_post(
     ):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
-    try:
-        update = await request.json()
-    except (json.JSONDecodeError, UnicodeDecodeError, ClientDisconnect):
-        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
-    if not isinstance(update, dict):
-        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+    update = await read_telegram_update(request)
 
     message = update.get("channel_post") or update.get("edited_channel_post")
     if not message:
@@ -66,14 +60,20 @@ async def receive_catalog_post(
     if update_id is None or message_id is None:
         raise HTTPException(status_code=400, detail="Missing Telegram update/message ID")
 
-    parsed = parse_catalog_post(message.get("text", ""), caption=message.get("caption", ""))
+    text_value = message.get("text", "")
+    caption_value = message.get("caption", "")
+    media = message.get("photo") or []
+    if not isinstance(text_value, str) or not isinstance(caption_value, str):
+        raise HTTPException(status_code=400, detail="Telegram text and caption must be strings")
+    if not isinstance(media, list):
+        raise HTTPException(status_code=400, detail="Invalid Telegram photo list")
+    parsed = parse_catalog_post(text_value, caption=caption_value)
     try:
         import psycopg
         from psycopg.types.json import Jsonb
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="PostgreSQL driver is not installed") from exc
 
-    media = message.get("photo") or []
     file_id = media[-1].get("file_id") if media and isinstance(media[-1], dict) else None
     parsed_payload = {
         "code": parsed.code,

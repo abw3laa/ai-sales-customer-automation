@@ -61,8 +61,40 @@ jobs:
               rows = conn.execute(
                   "SELECT version FROM schema_migrations ORDER BY version"
               ).fetchall()
-          assert len(rows) == 5, f"Expected 5 migrations, found {len(rows)}: {rows}"
+          assert len(rows) == 6, f"Expected 6 migrations, found {len(rows)}: {rows}"
           print(f"Migration smoke test passed: {len(rows)} migrations recorded after rerun.")
+          PY
+      - name: Verify migration runner refuses an untracked existing schema
+        env:
+          BASELINE_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sales_automation_baseline_test
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+
+          with psycopg.connect(
+              "postgresql://postgres:postgres@localhost:5432/postgres",
+              autocommit=True,
+          ) as conn:
+              conn.execute("DROP DATABASE IF EXISTS sales_automation_baseline_test WITH (FORCE)")
+              conn.execute("CREATE DATABASE sales_automation_baseline_test")
+          with psycopg.connect(os.environ["BASELINE_TEST_DATABASE_URL"]) as conn:
+              conn.execute("CREATE TABLE conversations (id integer PRIMARY KEY)")
+          PY
+          set +e
+          output=$(DATABASE_URL="$BASELINE_TEST_DATABASE_URL" python scripts/migrate.py 2>&1)
+          status=$?
+          set -e
+          test "$status" -ne 0
+          echo "$output" | grep -q "Refusing to apply all migrations blindly"
+          python - <<'PY'
+          import os
+          import psycopg
+
+          with psycopg.connect(os.environ["BASELINE_TEST_DATABASE_URL"]) as conn:
+              rows = conn.execute("SELECT version FROM schema_migrations").fetchall()
+          assert rows == [], f"Unexpected migrations applied to untracked schema: {rows}"
+          print("Baseline safety test passed: no migrations were applied.")
           PY
       - name: Build Docker image
         run: docker build --tag ai-sales-customer-automation:ci .

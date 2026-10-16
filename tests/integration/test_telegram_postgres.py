@@ -347,3 +347,50 @@ def test_product_lookup_is_isolated_by_tenant(postgres_schema):
     finally:
         with psycopg.connect(postgres_schema) as conn:
             conn.execute("DELETE FROM tenants WHERE id IN (%s::uuid, %s::uuid)", (tenant_a, tenant_b))
+
+@pytest.mark.parametrize(
+    ("endpoint", "secret_name"),
+    [
+        ("/v1/webhooks/telegram/catalog", "TELEGRAM_CATALOG_WEBHOOK_SECRET"),
+        ("/v1/webhooks/telegram/operator", "TELEGRAM_OPERATOR_WEBHOOK_SECRET"),
+    ],
+)
+def test_telegram_webhooks_reject_oversized_body(monkeypatch, endpoint, secret_name):
+    monkeypatch.setenv(secret_name, "integration-secret")
+    client = TestClient(app)
+    response = client.post(
+        endpoint,
+        content=b"{" + b" " * (256 * 1024 + 1),
+        headers={
+            "Content-Type": "application/json",
+            "X-Telegram-Bot-Api-Secret-Token": "integration-secret",
+        },
+    )
+    assert response.status_code == 413
+
+
+def test_database_rejects_cross_tenant_conversation_channel(tenant, postgres_schema):
+    other_tenant = str(uuid4())
+    with psycopg.connect(postgres_schema) as conn:
+        conn.execute(
+            "INSERT INTO tenants (id, name, slug) VALUES (%s::uuid, %s, %s)",
+            (other_tenant, "Other Tenant", f"other-{other_tenant}"),
+        )
+        channel_id = conn.execute(
+            """INSERT INTO channels (tenant_id, provider, external_account_id, display_name)
+            VALUES (%s::uuid, 'whatsapp', %s, 'Other tenant channel') RETURNING id""",
+            (other_tenant, f"external-{other_tenant}"),
+        ).fetchone()[0]
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        with psycopg.connect(postgres_schema) as conn:
+            conn.execute(
+                """INSERT INTO conversations
+                (tenant_id, channel_id, external_sender_id)
+                VALUES (%s::uuid, %s::uuid, %s)""",
+                (tenant, str(channel_id), "cross-tenant-sender"),
+            )
+
+    with psycopg.connect(postgres_schema) as conn:
+        conn.execute("DELETE FROM tenants WHERE id=%s::uuid", (other_tenant,))
+
