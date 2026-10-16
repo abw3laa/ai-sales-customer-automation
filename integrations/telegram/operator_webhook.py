@@ -21,6 +21,37 @@ from integrations.telegram.operator_catalog import (
     search_products,
 )
 
+MAX_WEBHOOK_BODY_BYTES = 1_048_576
+
+
+async def _read_json_limited(request: Request) -> dict:
+    """Read a bounded JSON request body before parsing it."""
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_WEBHOOK_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="Webhook payload too large")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid Content-Length") from None
+
+    body = bytearray()
+    try:
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > MAX_WEBHOOK_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="Webhook payload too large")
+    except ClientDisconnect:
+        raise HTTPException(status_code=400, detail="Incomplete request body") from None
+
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+    return payload
+
+
 router = APIRouter(prefix="/v1/webhooks/telegram", tags=["telegram-operator"])
 
 
@@ -53,12 +84,7 @@ async def receive_operator_update(
     ):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
-    try:
-        update = await request.json()
-    except (json.JSONDecodeError, UnicodeDecodeError, ClientDisconnect):
-        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
-    if not isinstance(update, dict):
-        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+    update = await _read_json_limited(request)
 
     message = update.get("message")
     if not isinstance(message, dict) or not message.get("text"):
