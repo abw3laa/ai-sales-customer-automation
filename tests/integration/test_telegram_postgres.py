@@ -369,3 +369,29 @@ def test_telegram_webhooks_reject_oversized_body(monkeypatch, endpoint, secret_n
     assert response.status_code == 413
     assert response.json()["detail"] == "Webhook payload too large"
 
+def test_database_rejects_cross_tenant_conversation_channel(tenant, postgres_schema):
+    other_tenant = str(uuid4())
+    channel_id = None
+    with psycopg.connect(postgres_schema) as conn:
+        conn.execute(
+            "INSERT INTO tenants (id, name, slug) VALUES (%s::uuid, %s, %s)",
+            (other_tenant, "Other Tenant", f"other-{other_tenant}"),
+        )
+        channel_id = conn.execute(
+            """INSERT INTO channels (tenant_id, provider, external_account_id, display_name)
+            VALUES (%s::uuid, 'whatsapp', %s, 'Other tenant channel') RETURNING id""",
+            (other_tenant, f"external-{other_tenant}"),
+        ).fetchone()[0]
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        with psycopg.connect(postgres_schema) as conn:
+            conn.execute(
+                """INSERT INTO conversations
+                (tenant_id, channel_id, external_sender_id)
+                VALUES (%s::uuid, %s::uuid, %s)""",
+                (tenant, str(channel_id), "cross-tenant-sender"),
+            )
+
+    with psycopg.connect(postgres_schema) as conn:
+        conn.execute("DELETE FROM tenants WHERE id=%s::uuid", (other_tenant,))
+
