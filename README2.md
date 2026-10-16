@@ -131,15 +131,14 @@ pytest
 
 ## 7. نتائج CI التي تم التحقق منها
 
-آخر تشغيلين تم التحقق منهما في 15 أكتوبر 2026:
-- على فرع `hardening/production-readiness`: التشغيل `38792187117` على commit `ee8033882780e001bf43a0665b27f0a5acbf4eba`، والنتيجة `success`. شمل تهيئة PostgreSQL، واختبار الترحيلات بتشغيلها مرتين والتحقق من تسجيل خمس ترحيلات، وبناء Docker، وفحص إعداد Compose، وRuff، وpytest.
-- على `main`: التشغيل `38792588621` على commit `4e5a1eca528d1db56cb627cfc0bd9b6660db2959`، والنتيجة `success`، مع نجاح وظيفة الاختبار.
+هناك تشغيلات سابقة ناجحة على commits محددة، لكنها لا تشمل تغييرات التحصين الموجودة حاليًا في PR #5. يجب التحقق من تشغيل PR #5 ونتيجته النهائية قبل الدمج.
 
-هذه النتائج تخص الـ commits المحددة فقط. نجاح CI لا يثبت وحده جاهزية الإنتاج أو أن الخدمات نُشرت على خادم.
+- تشغيل سابق على فرع `hardening/production-readiness`: [38792187117](https://github.com/abw3laa/ai-sales-customer-automation/actions/runs/38792187117)، على commit أقدم.
+- تشغيل سابق على `main`: [38792588621](https://github.com/abw3laa/ai-sales-customer-automation/actions/runs/38792588621)، على commit أقدم.
+- تغييرات التحصين الحالية: [PR #5](https://github.com/abw3laa/ai-sales-customer-automation/pull/5).
 
-روابط التشغيل: https://github.com/abw3laa/ai-sales-customer-automation/actions/runs/38792187117 و https://github.com/abw3laa/ai-sales-customer-automation/actions/runs/38792588621
-
-## 8. النواقص والمخاطر قبل الإنتاج
+نجاح تشغيل سابق لا يثبت نجاح تغييرات PR #5، ولا يثبت وحده جاهزية الإنتاج أو نشر الخدمات على خادم.
+\n\n## 8. النواقص والمخاطر قبل الإنتاج
 
 1. لم يكتمل تنفيذ تدفق المحادثات متعدد القنوات، ولا الردود الفعلية المدعومة بالذكاء الاصطناعي.
 2. المسار العام `/v1/webhooks/{channel}` تجريبي وغير موثق بمصادقة مزود أو تخزين دائم.
