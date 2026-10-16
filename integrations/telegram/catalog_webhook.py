@@ -60,14 +60,20 @@ async def receive_catalog_post(
     if update_id is None or message_id is None:
         raise HTTPException(status_code=400, detail="Missing Telegram update/message ID")
 
-    parsed = parse_catalog_post(message.get("text", ""), caption=message.get("caption", ""))
+    text_value = message.get("text", "")
+    caption_value = message.get("caption", "")
+    media = message.get("photo") or []
+    if not isinstance(text_value, str) or not isinstance(caption_value, str):
+        raise HTTPException(status_code=400, detail="Telegram text and caption must be strings")
+    if not isinstance(media, list):
+        raise HTTPException(status_code=400, detail="Invalid Telegram photo list")
+    parsed = parse_catalog_post(text_value, caption=caption_value)
     try:
         import psycopg
         from psycopg.types.json import Jsonb
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="PostgreSQL driver is not installed") from exc
 
-    media = message.get("photo") or []
     file_id = media[-1].get("file_id") if media and isinstance(media[-1], dict) else None
     parsed_payload = {
         "code": parsed.code,
