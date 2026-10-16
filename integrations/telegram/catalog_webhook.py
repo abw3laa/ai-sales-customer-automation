@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import hmac
-import json
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
-from starlette.requests import ClientDisconnect
 
 from core.catalog.parser import parse_catalog_post
+from integrations.telegram.webhook_utils import read_telegram_update
 
 router = APIRouter(prefix="/v1/webhooks/telegram", tags=["telegram-catalog"])
 
@@ -37,12 +36,7 @@ async def receive_catalog_post(
     ):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
-    try:
-        update = await request.json()
-    except (json.JSONDecodeError, UnicodeDecodeError, ClientDisconnect):
-        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
-    if not isinstance(update, dict):
-        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+    update = await read_telegram_update(request)
 
     message = update.get("channel_post") or update.get("edited_channel_post")
     if not message:
