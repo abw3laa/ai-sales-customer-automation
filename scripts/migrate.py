@@ -42,9 +42,19 @@ def main() -> int:
         ).fetchone()[0]
         if applied_count == 0:
             existing_schema = conn.execute(
-                """SELECT to_regclass('public.tenants') IS NOT NULL
-                    OR to_regclass('public.channels') IS NOT NULL
-                    OR to_regclass('public.products') IS NOT NULL"""
+                """SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_class AS c
+                    JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+                    WHERE n.nspname = 'public'
+                      AND c.relkind IN ('r', 'p')
+                      AND c.relname = ANY (%s)
+                )""",
+                ([
+                    'tenants', 'channels', 'contacts', 'conversations',
+                    'messages', 'leads', 'products', 'product_media',
+                    'product_variants', 'product_review_queue',
+                ],),
             ).fetchone()[0]
             if existing_schema:
                 raise RuntimeError(
