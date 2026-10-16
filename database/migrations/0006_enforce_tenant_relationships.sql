@@ -44,6 +44,14 @@ BEGIN
     IF bad_count > 0 THEN
         RAISE EXCEPTION 'Migration 0006 blocked: % leads reference another tenant conversation', bad_count;
     END IF;
+
+    SELECT count(*) INTO bad_count
+    FROM product_media pm
+    JOIN products p ON p.id = pm.product_id
+    WHERE pm.tenant_id <> p.tenant_id;
+    IF bad_count > 0 THEN
+        RAISE EXCEPTION 'Migration 0006 blocked: % media rows reference another tenant product', bad_count;
+    END IF;
 END $$;
 
 ALTER TABLE channels
@@ -52,6 +60,8 @@ ALTER TABLE contacts
     ADD CONSTRAINT contacts_tenant_id_id_key UNIQUE (tenant_id, id);
 ALTER TABLE conversations
     ADD CONSTRAINT conversations_tenant_id_id_key UNIQUE (tenant_id, id);
+ALTER TABLE products
+    ADD CONSTRAINT products_tenant_id_id_key UNIQUE (tenant_id, id);
 
 ALTER TABLE conversations
     DROP CONSTRAINT IF EXISTS conversations_channel_id_fkey;
@@ -87,3 +97,8 @@ ALTER TABLE leads
     ADD CONSTRAINT leads_tenant_conversation_fkey
     FOREIGN KEY (tenant_id, conversation_id)
     REFERENCES conversations (tenant_id, id) ON DELETE SET NULL (conversation_id);
+
+ALTER TABLE product_media
+    ADD CONSTRAINT product_media_tenant_product_fkey
+    FOREIGN KEY (tenant_id, product_id)
+    REFERENCES products (tenant_id, id) ON DELETE CASCADE;
