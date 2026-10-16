@@ -61,7 +61,7 @@ jobs:
               rows = conn.execute(
                   "SELECT version FROM schema_migrations ORDER BY version"
               ).fetchall()
-          assert len(rows) == 5, f"Expected 5 migrations, found {len(rows)}: {rows}"
+          assert len(rows) == 6, f"Expected 6 migrations, found {len(rows)}: {rows}"
           print(f"Migration smoke test passed: {len(rows)} migrations recorded after rerun.")
           PY
       - name: Build Docker image
