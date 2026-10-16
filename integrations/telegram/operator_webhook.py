@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import hmac
-import json
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
-from starlette.requests import ClientDisconnect
 
 from core.handoff.repository import get_conversation_status, set_conversation_mode
+from integrations.telegram.webhook_utils import read_telegram_update
 from integrations.telegram.operator_bot import (
     HELP,
     authorized_operator,
@@ -53,19 +52,19 @@ async def receive_operator_update(
     ):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
-    try:
-        update = await request.json()
-    except (json.JSONDecodeError, UnicodeDecodeError, ClientDisconnect):
-        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
-    if not isinstance(update, dict):
-        raise HTTPException(status_code=400, detail="Telegram update must be a JSON object")
+    update = await read_telegram_update(request)
 
     message = update.get("message")
     if not isinstance(message, dict) or not message.get("text"):
         return {"status": "ignored"}
 
-    chat = message.get("chat") or {}
-    sender = message.get("from") or {}
+    chat = message.get("chat")
+    sender = message.get("from")
+    if not isinstance(chat, dict) or not isinstance(sender, dict):
+        raise HTTPException(status_code=400, detail="Invalid Telegram message structure")
+    text_value = message.get("text")
+    if not isinstance(text_value, str):
+        return {"status": "ignored"}
     user_id = sender.get("id")
     chat_id = chat.get("id")
     if (
@@ -78,7 +77,7 @@ async def receive_operator_update(
     if not authorized_operator(user_id):
         return _telegram_reply(chat_id, "غير مصرح لك باستخدام بوت الإدارة.")
 
-    parsed = parse_operator_text(message["text"])
+    parsed = parse_operator_text(text_value)
     if not parsed:
         return _telegram_reply(chat_id, HELP)
 
