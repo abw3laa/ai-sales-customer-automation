@@ -347,3 +347,25 @@ def test_product_lookup_is_isolated_by_tenant(postgres_schema):
     finally:
         with psycopg.connect(postgres_schema) as conn:
             conn.execute("DELETE FROM tenants WHERE id IN (%s::uuid, %s::uuid)", (tenant_a, tenant_b))
+
+@pytest.mark.parametrize(
+    ("endpoint", "secret_name"),
+    [
+        ("/v1/webhooks/telegram/catalog", "TELEGRAM_CATALOG_WEBHOOK_SECRET"),
+        ("/v1/webhooks/telegram/operator", "TELEGRAM_OPERATOR_WEBHOOK_SECRET"),
+    ],
+)
+def test_telegram_webhooks_reject_oversized_body(monkeypatch, endpoint, secret_name):
+    monkeypatch.setenv(secret_name, "integration-secret")
+    client = TestClient(app)
+    response = client.post(
+        endpoint,
+        content=b"{" + b" " * (1_048_576 + 1),
+        headers={
+            "Content-Type": "application/json",
+            "X-Telegram-Bot-Api-Secret-Token": "integration-secret",
+        },
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Webhook payload too large"
+
