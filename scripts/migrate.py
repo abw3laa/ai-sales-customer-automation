@@ -37,6 +37,29 @@ def main() -> int:
                 applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )"""
         )
+        applied_count = conn.execute(
+            "SELECT count(*) FROM schema_migrations"
+        ).fetchone()[0]
+        if applied_count == 0:
+            legacy_tables = []
+            for table in (
+                "tenants", "channels", "contacts", "conversations", "messages",
+                "leads", "products", "product_media", "product_ingestion_events",
+            ):
+                exists = conn.execute(
+                    "SELECT to_regclass(%s) IS NOT NULL", (f"public.{table}",)
+                ).fetchone()[0]
+                if exists:
+                    legacy_tables.append(table)
+            if legacy_tables:
+                print(
+                    "ERROR: Existing application tables have no migration history "
+                    f"({', '.join(legacy_tables)}). Refusing to apply migrations blindly. "
+                    "Back up the database, verify its schema, and establish an explicit "
+                    "baseline before retrying.",
+                    file=sys.stderr,
+                )
+                return 2
         for migration in files:
             with conn.transaction():
                 applied = conn.execute(
