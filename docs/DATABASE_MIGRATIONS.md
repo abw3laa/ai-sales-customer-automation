@@ -47,7 +47,11 @@ WHERE l.contact_id IS NOT NULL AND l.tenant_id <> co.tenant_id
 UNION ALL
 SELECT 'lead_conversation', count(*)
 FROM leads l JOIN conversations c ON c.id = l.conversation_id
-WHERE l.conversation_id IS NOT NULL AND l.tenant_id <> c.tenant_id;
+WHERE l.conversation_id IS NOT NULL AND l.tenant_id <> c.tenant_id
+UNION ALL
+SELECT 'product_media_product', count(*)
+FROM product_media pm JOIN products p ON p.id = pm.product_id
+WHERE pm.tenant_id <> p.tenant_id;
 ```
 
 All counts must be zero before applying migration 0006.
